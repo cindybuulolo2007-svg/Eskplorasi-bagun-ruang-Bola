@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eksplorasi 3D Bangun Ruang Bola - Media Pembelajaran Interaktif</title>
+    <!-- Tailwind CSS untuk antarmuka modern & responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono untuk angka -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            background-color: #f8fafc;
+        }
+        .font-mono-num {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            cursor: grab;
+        }
+        #canvas-container:active {
+            cursor: grabbing;
+        }
+        /* Kustomisasi scrollbar halus pada panel kontrol */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(226, 232, 240, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.35);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.65);
+        }
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #0284c7;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 12px rgba(2, 132, 199, 0.4);
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #0369a1;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #e2e8f0;
+            border-radius: 999px;
+            border: 1px solid rgba(203, 213, 225, 0.8);
+        }
+        /* Label 3D melayang */
+        .label-3d {
+            position: absolute;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.2s ease;
+            z-index: 10;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        }
+        .card-hover-effect {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card-hover-effect:hover {
+            transform: translateY(-1px);
+            border-color: rgba(2, 132, 199, 0.4);
+        }
+    </style>
+</head>
+<body class="text-slate-800 h-screen w-screen flex flex-col md:flex-row select-none">
+
+    <!-- AREA VISUALISASI 3D (KIRI / ATAS PADA MOBILE) -->
+    <main class="relative flex-1 h-[52vh] md:h-full bg-gradient-to-br from-[#fdfbf7] via-[#f4f7f6] to-[#edf2f7] overflow-hidden">
+        <!-- Header Mengambang di Atas Canvas -->
+        <header class="absolute top-0 left-0 right-0 z-20 p-4 md:p-6 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+            <div class="pointer-events-auto glass-panel px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/15 to-sky-600/5 border border-sky-500/30 flex items-center justify-center text-sky-600 shadow-inner">
+                    <i data-lucide="globe" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm md:text-base font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                        <span>Eksplorasi 3D Bola</span>
+                        <span class="text-[10px] font-mono-num px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-700 border border-sky-500/30 hidden sm:inline-block">Kertas / Terang</span>
+                    </h1>
+                    <p class="text-[11px] text-slate-500">Media Pembelajaran Geometri Ruang Sisi Lengkung</p>
+                </div>
+            </div>
+
+            <!-- Tombol Kontrol Kamera & Auto-Rotate -->
+            <div class="pointer-events-auto flex items-center gap-1.5 glass-panel p-1.5 rounded-2xl shadow-xl">
+                <button id="btn-autorotate" title="Putar Otomatis" class="p-2 rounded-xl text-xs font-medium flex items-center gap-1.5 bg-sky-500/15 text-sky-700 border border-sky-500/30 transition hover:bg-sky-500/25 shadow-sm">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Putar</span>
+                </button>
+                <button id="btn-wireframe" title="Mode Rangka (Wireframe)" class="p-2 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-600 hover:bg-slate-200/80 transition">
+                    <i data-lucide="grid" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Rangka</span>
+                </button>
+                <button id="btn-reset-cam" title="Reset Posisi Kamera" class="p-2 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-600 hover:bg-slate-200/80 transition">
+                    <i data-lucide="maximize-2" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Reset</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Container Canvas Three.js -->
+        <div id="canvas-container"></div>
+
+        <!-- Label 3D Dinamis -->
+        <div id="labels-layer" class="absolute inset-0 pointer-events-none overflow-hidden">
+            <div id="label-center" class="label-3d bg-amber-400 text-slate-900 font-bold text-[11px] px-2.5 py-0.5 rounded-full shadow-md border border-amber-200">
+                Titik Pusat (O)
+            </div>
+            <div id="label-radius" class="label-3d bg-emerald-500 text-white font-bold text-[11px] px-2.5 py-0.5 rounded-full shadow-md border border-emerald-300">
+                Jari-jari (r)
+            </div>
+            <div id="label-diameter" class="label-3d bg-rose-600 text-white font-bold text-[11px] px-2.5 py-0.5 rounded-full shadow-md border border-rose-400">
+                Diameter (d = 2r)
+            </div>
+            <div id="label-equator" class="label-3d bg-sky-500 text-white font-bold text-[11px] px-2.5 py-0.5 rounded-full shadow-md border border-sky-300 hidden">
+                Lingkaran Besar (K = 2πr)
+            </div>
+            <div id="label-circle-1" class="label-3d bg-sky-500 text-white font-bold text-[11px] px-2.5 py-0.5 rounded-full shadow-md border border-sky-300 hidden">
+                Lingkaran 1 (πr²)
+            </div>
+            <div id="label-circle-2" class="label-3d bg-emerald-500 text-white font-bold text-[11px] px-2.5 py-0.5 rounded-full shadow-md border border-emerald-300 hidden">
+                Lingkaran 2 (πr²)
+            </div>
+            <div id="label-circle-3" class="label-3d bg-amber-500 text-slate-900 font-bold text-[11px] px-2.5 py-0.5 rounded-full shadow-md border border-amber-300 hidden">
+                Lingkaran 3 (πr²)
+            </div>
+            <div id="label-circle-4" class="label-3d bg-rose-600 text-white font-bold text-[11px] px-2.5 py-0.5 rounded-full shadow-md border border-rose-400 hidden">
+                Lingkaran 4 (πr²)
+            </div>
+            <div id="lbl-ball-r" class="label-3d bg-sky-500 text-white font-bold text-[11px] px-2.5 py-0.5 rounded-full shadow-md border border-sky-300 transition-opacity">r = 7,0 cm</div>
+            <div id="lbl-cone-r" class="label-3d bg-emerald-500 text-white font-bold text-[11px] px-2.5 py-0.5 rounded-full shadow-md border border-emerald-300 transition-opacity">r = 7,0 cm</div>
+            <div id="lbl-cone-t" class="label-3d bg-rose-600 text-white font-bold text-[11px] px-2.5 py-0.5 rounded-full shadow-md border border-rose-400 transition-opacity">t = 14,0 cm</div>
+        </div>
+
+        <!-- Legenda Warna di Bawah Kiri Canvas -->
+        <div id="legend-bar" class="absolute bottom-4 left-4 z-20 pointer-events-none hidden sm:flex flex-wrap items-center gap-3.5 glass-panel px-4 py-2 rounded-xl text-xs text-slate-600 shadow-xl">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm inline-block"></span> Pusat</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm inline-block"></span> Jari-jari</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-600 shadow-sm inline-block"></span> Diameter</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-sky-500 shadow-sm inline-block"></span> Irisan</span>
+        </div>
+
+        <!-- Petunjuk Interaksi di Bawah Kanan Canvas -->
+        <div class="absolute bottom-4 right-4 z-20 pointer-events-none hidden lg:flex items-center gap-2 glass-panel px-3 py-1.5 rounded-xl text-[11px] text-slate-500 shadow-xl">
+            <i data-lucide="mouse-pointer-click" class="w-3.5 h-3.5 text-sky-600"></i>
+            <span>Seret: Putar • Scroll: Zoom</span>
+        </div>
+    </main>
+
+    <!-- PANEL KONTROL & EDUKASI (KANAN / BAWAH PADA MOBILE) -->
+    <aside class="w-full md:w-[440px] lg:w-[480px] h-[48vh] md:h-full bg-white/95 backdrop-blur-2xl border-t md:border-t-0 md:border-l border-slate-200 flex flex-col z-30 shadow-2xl">
+        
+        <!-- Tab Navigasi Utama dengan Indikator Aktif Menarik -->
+        <div class="grid grid-cols-2 p-3 bg-slate-100/90 border-b border-slate-200 gap-2 shrink-0">
+            <button id="tab-btn-control" class="tab-btn active py-3 px-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-2.5 bg-gradient-to-r from-sky-600 to-sky-500 text-white shadow-lg shadow-sky-600/20 transition-all transform active:scale-95">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+                Simulasi & Kalkulator
+            </button>
+            <button id="tab-btn-learn" class="tab-btn py-3 px-4 rounded-2xl text-xs font-semibold flex items-center justify-center gap-2.5 text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-all transform active:scale-95">
+                <i data-lucide="book-open" class="w-4 h-4"></i>
+                Konsep & Materi
+            </button>
+        </div>
+
+        <!-- ISI TAB 1: KONTROL INTERAKTIF & KALKULATOR -->
+        <div id="tab-content-control" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
+
+            <!-- KELOMPOK 1: PILIHAN MODE VISUALISASI 3D -->
+            <section class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <label class="text-[11px] font-bold uppercase tracking-wider text-sky-700 flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        1. Pilih Mode Visualisasi 3D
+                    </label>
+                    <span class="text-[10px] text-sky-700 font-mono-num px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/30">4 Mode Interaktif</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- Mode 1: Bola Utuh -->
+                    <button data-mode="full" class="mode-card active card-hover-effect flex flex-col p-3.5 rounded-2xl border border-sky-500 bg-sky-500/10 text-sky-900 text-left relative overflow-hidden group shadow-sm">
+                        <div class="flex items-center justify-between mb-2.5">
+                            <div class="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-700 shadow-inner">
+                                <i data-lucide="globe" class="w-4 h-4"></i>
+                            </div>
+                            <span class="w-2.5 h-2.5 rounded-full bg-sky-500 shadow-[0_0_10px_#0ea5e9]"></span>
+                        </div>
+                        <div class="text-xs font-bold leading-snug">1. Bola Utuh</div>
+                        <div class="text-[10px] text-slate-600 mt-0.5">Pusat, r, d & Kulit</div>
+                    </button>
+
+                    <!-- Mode 2: Belah Bola -->
+                    <button data-mode="hemisphere" class="mode-card card-hover-effect flex flex-col p-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 text-left relative overflow-hidden group shadow-sm">
+                        <div class="flex items-center justify-between mb-2.5">
+                            <div class="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
+                                <i data-lucide="scissors" class="w-4 h-4"></i>
+                            </div>
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-300 group-hover:bg-indigo-600 transition"></span>
+                        </div>
+                        <div class="text-xs font-bold leading-snug">2. Belah Bola</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">Penampang Irisan</div>
+                    </button>
+
+                    <!-- Mode 3: Luas 4πr² -->
+                    <button data-mode="surface4" class="mode-card card-hover-effect flex flex-col p-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 text-left relative overflow-hidden group shadow-sm">
+                        <div class="flex items-center justify-between mb-2.5">
+                            <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                                <i data-lucide="disc" class="w-4 h-4"></i>
+                            </div>
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-300 group-hover:bg-emerald-600 transition"></span>
+                        </div>
+                        <div class="text-xs font-bold leading-snug">3. Luas 4πr²</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">Kupas 4 Lingkaran</div>
+                    </button>
+
+                    <!-- Mode 4: Volume ⁴⁄₃πr³ -->
+                    <button data-mode="volumeWater" class="mode-card card-hover-effect flex flex-col p-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 text-left relative overflow-hidden group shadow-sm">
+                        <div class="flex items-center justify-between mb-2.5">
+                            <div class="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
+                                <i data-lucide="droplets" class="w-4 h-4"></i>
+                            </div>
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-300 group-hover:bg-amber-600 transition"></span>
+                        </div>
+                        <div class="text-xs font-bold leading-snug">4. Volume ⁴⁄₃πr³</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">Tuang Air ke Kerucut</div>
+                    </button>
+                </div>
+
+                <!-- Box Kontrol Transisi / Slider Utama -->
+                <div class="bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100 border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-md">
+                    <div class="flex items-center justify-between gap-2">
+                        <span id="explode-label-title" class="text-xs font-semibold text-slate-700 flex items-center gap-2">
+                            <i data-lucide="sliders" class="w-3.5 h-3.5 text-sky-600 shrink-0"></i>
+                            <span id="explode-title-text">Transparansi Kulit Bola</span>
+                        </span>
+                        <span id="explode-value-badge" class="font-mono-num text-xs font-bold px-3 py-1 rounded-xl bg-white text-sky-700 border border-slate-200 shadow-sm">45%</span>
+                    </div>
+                    <input id="slider-explode" type="range" min="0" max="100" value="45" class="w-full">
+                    
+                    <!-- Aksi Cepat Mode 3 -->
+                    <div id="surface4-quick-actions" class="hidden pt-1 flex items-center gap-2.5">
+                        <button id="btn-animate-unfold" class="flex-1 py-2.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition">
+                            <i data-lucide="play" class="w-4 h-4 fill-white"></i>
+                            <span id="btn-animate-unfold-text">Mulai Animasi Kupas</span>
+                        </button>
+                        <button id="btn-top-view" title="Sudut Pandang Atas (2x2 Lingkaran)" class="py-2.5 px-3.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-2 transition shadow-sm">
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+                            <span>Atas</span>
+                        </button>
+                    </div>
+
+                    <!-- Aksi Cepat Mode 4 -->
+                    <div id="volume-water-quick-actions" class="hidden pt-1 space-y-3">
+                        <div class="flex items-center gap-2.5">
+                            <button id="btn-animate-pour" class="flex-1 py-2.5 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md transition">
+                                <i data-lucide="play" class="w-4 h-4 fill-slate-950"></i>
+                                <span id="btn-animate-pour-text">Tuang Air ke 2 Kerucut</span>
+                            </button>
+                            <button id="btn-toggle-cones" title="Tampilkan Garis Ukuran r & t = 2r" class="py-2.5 px-3.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-700 text-xs font-bold flex items-center gap-2 transition">
+                                <i data-lucide="ruler" class="w-4 h-4"></i>
+                                <span id="btn-toggle-cones-text">Ukuran: ON</span>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 font-mono-num text-[10px]">
+                            <div class="bg-white border border-slate-200 rounded-xl p-2.5 text-center shadow-sm">
+                                <div class="text-slate-500">Air Bola</div>
+                                <div id="water-ball-pct" class="text-sky-700 font-bold text-xs mt-1">100%</div>
+                            </div>
+                            <div class="bg-white border border-slate-200 rounded-xl p-2.5 text-center shadow-sm">
+                                <div class="text-slate-500">Kerucut 1</div>
+                                <div id="water-cone1-pct" class="text-emerald-600 font-bold text-xs mt-1">0%</div>
+                            </div>
+                            <div class="bg-white border border-slate-200 rounded-xl p-2.5 text-center shadow-sm">
+                                <div class="text-slate-500">Kerucut 2</div>
+                                <div id="water-cone2-pct" class="text-amber-600 font-bold text-xs mt-1">0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p id="explode-hint" class="text-[11px] text-slate-600 leading-relaxed pt-0.5">
+                        Geser slider untuk melihat titik pusat, jari-jari (r), dan garis tengah diameter (d) secara interaktif.
+                    </p>
+                </div>
+            </section>
+
+            <!-- KELOMPOK 2: PENGATURAN UKURAN JARI-JARI (r) -->
+            <section class="bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100 border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-md">
+                <div class="flex items-center justify-between">
+                    <label for="slider-radius" class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-2">
+                        <i data-lucide="ruler" class="w-4 h-4"></i>
+                        2. Ukuran Jari-Jari (r)
+                    </label>
+                    <span id="display-radius" class="font-mono-num text-sm font-bold text-emerald-700 bg-white px-3.5 py-1 rounded-xl border border-emerald-500/30 shadow-sm">7.0 cm</span>
+                </div>
+                <input id="slider-radius" type="range" min="1" max="15" step="0.5" value="7" class="w-full">
+                <div class="flex justify-between text-[11px] text-slate-600 font-mono-num">
+                    <span>1 cm</span>
+                    <span>Diameter (d) = <strong id="display-diameter" class="text-rose-600">14.0 cm</strong></span>
+                    <span>15 cm</span>
+                </div>
+            </section>
+
+            <!-- KELOMPOK 3: KALKULATOR RUMUS REAL-TIME -->
+            <section class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-[11px] font-bold uppercase tracking-wider text-sky-700 flex items-center gap-2">
+                        <i data-lucide="calculator" class="w-4 h-4"></i>
+                        3. Kalkulator Hitung Otomatis
+                    </h2>
+                    <button id="btn-toggle-pi" class="text-[11px] font-semibold px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-sky-700 transition shadow-sm flex items-center gap-1.5">
+                        <i data-lucide="pi" class="w-3.5 h-3.5"></i>
+                        <span>Mode: Desimal</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Kartu Luas Permukaan -->
+                    <div class="bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100 border border-slate-200 p-4 rounded-2xl shadow-sm relative overflow-hidden group hover:border-sky-500/40 transition">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-sky-700">Luas Permukaan</span>
+                            <span class="text-[10px] font-mono-num bg-sky-500/15 text-sky-800 px-2 py-0.5 rounded-lg border border-sky-500/30">4πr²</span>
+                        </div>
+                        <div id="val-surface-area" class="font-mono-num text-base md:text-lg font-bold text-slate-900 tracking-tight">615,75 cm²</div>
+                        <div id="step-surface-area" class="text-[10px] text-slate-500 mt-1 font-mono-num">4 × π × 7²</div>
+                    </div>
+
+                    <!-- Kartu Volume Bola -->
+                    <div class="bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100 border border-slate-200 p-4 rounded-2xl shadow-sm relative overflow-hidden group hover:border-amber-500/40 transition">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-amber-700">Volume Bola</span>
+                            <span class="text-[10px] font-mono-num bg-amber-500/15 text-amber-800 px-2 py-0.5 rounded-lg border border-amber-500/30">⁴⁄₃πr³</span>
+                        </div>
+                        <div id="val-volume" class="font-mono-num text-base md:text-lg font-bold text-slate-900 tracking-tight">1.436,76 cm³</div>
+                        <div id="step-volume" class="text-[10px] text-slate-500 mt-1 font-mono-num">⁴⁄₃ × π × 7³</div>
+                    </div>
+
+                    <!-- Kartu Keliling -->
+                    <div class="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl shadow-sm">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-xs font-semibold text-emerald-700">Keliling Tengah</span>
+                            <span class="text-[10px] font-mono-num bg-emerald-500/15 text-emerald-800 px-2 py-0.5 rounded border border-emerald-500/20">2πr</span>
+                        </div>
+                        <div id="val-circumference" class="font-mono-num text-sm md:text-base font-bold text-slate-900">43,98 cm</div>
+                        <div id="step-circumference" class="text-[10px] text-slate-500 mt-0.5 font-mono-num">2 × π × 7</div>
+                    </div>
+
+                    <!-- Kartu Luas Irisan -->
+                    <div class="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl shadow-sm">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-xs font-semibold text-rose-700">Luas Irisan Tengah</span>
+                            <span class="text-[10px] font-mono-num bg-rose-500/15 text-rose-800 px-2 py-0.5 rounded border border-rose-500/20">πr²</span>
+                        </div>
+                        <div id="val-cross-area" class="font-mono-num text-sm md:text-base font-bold text-slate-900">153,94 cm²</div>
+                        <div id="step-cross-area" class="text-[10px] text-slate-500 mt-0.5 font-mono-num">π × 7² (¼ Luas)</div>
+                    </div>
+
+                    <!-- Kartu Mencari Jari-Jari (r) Balik dari Rumus -->
+                    <div class="sm:col-span-2 bg-gradient-to-br from-emerald-500/10 via-slate-50 to-slate-100 border border-emerald-500/30 p-4 rounded-2xl shadow-sm space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                                <i data-lucide="compass" class="w-4 h-4 text-emerald-600"></i>
+                                Cara Mencari Jari-Jari (r)
+                            </span>
+                            <select id="select-radius-formula" class="text-[11px] font-semibold bg-white border border-emerald-500/30 text-emerald-800 rounded-xl px-2.5 py-1 outline-none shadow-sm cursor-pointer">
+                                <option value="volume" selected>Dari Volume (V)</option>
+                                <option value="surface">Dari Luas (L)</option>
+                                <option value="circumference">Dari Keliling (K)</option>
+                                <option value="diameter">Dari Diameter (d)</option>
+                            </select>
+                        </div>
+                        <div class="bg-white/95 border border-slate-200 rounded-xl p-3 space-y-2">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div id="radius-formula-symbolic" class="font-mono-num text-xs font-bold text-emerald-700">r = ∛(3V ÷ 4π)</div>
+                                <div id="radius-formula-result" class="font-mono-num text-xs md:text-sm font-bold text-slate-900 bg-emerald-500/15 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                                    r = 7,00 cm
+                                </div>
+                            </div>
+                            <!-- Penjabaran Langkah Aljabar -->
+                            <div id="radius-formula-derivation" class="bg-slate-900 text-slate-100 rounded-lg p-2.5 font-mono-num text-[10px] leading-relaxed space-y-0.5">
+                                <div class="text-slate-400">// Langkah mengubah V menjadi r:</div>
+                                <div>1. V = (4/3) × π × r³</div>
+                                <div>2. 3V = 4 × π × r³  <span class="text-slate-400">(kedua ruas × 3)</span></div>
+                                <div>3. r³ = 3V ÷ (4π)   <span class="text-slate-400">(pindah ruas 4π)</span></div>
+                                <div class="text-emerald-400 font-bold">4. r = ∛(3V ÷ 4π)</div>
+                            </div>
+                            <div id="radius-formula-step" class="font-mono-num text-[11px] text-slate-700 pt-0.5 border-t border-slate-100">
+                                Hitung: r = ∛(3 × 1.436,76 ÷ 4π) = 7,00 cm
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Toggles Label 3D -->
+            <div class="pt-3 pb-2 flex items-center justify-between border-t border-slate-200 text-xs text-slate-700">
+                <span class="flex items-center gap-2 font-medium">
+                    <i data-lucide="tag" class="w-4 h-4 text-sky-600"></i>
+                    Tampilkan Label Garis 3D
+                </span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="toggle-labels" checked class="sr-only peer">
+                    <div class="w-10 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                </label>
+            </div>
+        </div>
+
+        <!-- ISI TAB 2: PENJELASAN KONSEP EDUKATIF (Tampilan Estetik & Terstruktur) -->
+        <div id="tab-content-learn" class="hidden flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+            
+            <!-- Hero Card Pengantar -->
+            <div class="bg-gradient-to-br from-sky-500/15 via-sky-500/5 to-transparent border border-sky-500/30 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+                <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-sky-400/10 rounded-full blur-xl pointer-events-none"></div>
+                <h3 class="text-xs md:text-sm font-bold text-sky-800 flex items-center gap-2.5">
+                    <div class="w-7 h-7 rounded-xl bg-sky-500/20 flex items-center justify-center text-sky-700">
+                        <i data-lucide="globe" class="w-4 h-4"></i>
+                    </div>
+                    Mengenal Bangun Ruang Bola
+                </h3>
+                <p class="text-xs text-slate-600 mt-2.5 leading-relaxed">
+                    <strong>Bola</strong> adalah bangun ruang sisi lengkung istimewa yang dibentuk dari tak hingga lingkaran dengan jari-jari sama panjang dan berpusat pada satu titik yang sama (<strong class="text-amber-700">Titik Pusat O</strong>). Bola hanya memiliki <strong>1 sisi lengkung</strong> tanpa rusuk maupun titik sudut.
+                </p>
+            </div>
+
+            <!-- Kartu Konsep 1: Unsur & Irisan -->
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm hover:border-emerald-500/40 transition">
+                <div class="flex items-center gap-2 text-emerald-700 text-xs font-bold uppercase tracking-wider">
+                    <div class="w-7 h-7 rounded-xl bg-emerald-500/15 flex items-center justify-center">
+                        <i data-lucide="compass" class="w-4 h-4"></i>
+                    </div>
+                    <span>1. Unsur & Lingkaran Besar</span>
+                </div>
+                <ul class="text-xs text-slate-600 space-y-2 list-disc pl-4 leading-relaxed">
+                    <li><strong>Jari-jari (<span class="font-mono-num text-emerald-700">r</span>):</strong> Jarak lurus dari titik pusat ke kulit luar bola.</li>
+                    <li><strong>Diameter (<span class="font-mono-num text-rose-600">d = 2r</span>):</strong> Garis tengah terpanjang yang membelah bola melalui titik pusat.</li>
+                    <li><strong>Lingkaran Besar:</strong> Irisan tepat di tengah bola dengan luas <span class="font-mono-num text-sky-700">A = πr²</span> dan keliling <span class="font-mono-num text-sky-700">K = 2πr</span>.</li>
+                </ul>
+                <button onclick="switchModeAndDemo('hemisphere', 65)" class="mt-1 w-full py-2.5 px-3.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-sky-700 text-xs font-semibold flex items-center justify-center gap-2 transition shadow-sm">
+                    <i data-lucide="play" class="w-3.5 h-3.5"></i> Simulasi 3D Belah Bola
+                </button>
+            </div>
+
+            <!-- Kartu Konsep 2: Luas Permukaan -->
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm hover:border-sky-500/40 transition">
+                <div class="flex items-center gap-2 text-sky-700 text-xs font-bold uppercase tracking-wider">
+                    <div class="w-7 h-7 rounded-xl bg-sky-500/15 flex items-center justify-center">
+                        <i data-lucide="disc" class="w-4 h-4"></i>
+                    </div>
+                    <span>2. Luas Permukaan = 4πr²</span>
+                </div>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Luas seluruh kulit bola terbukti persis sama dengan <strong class="text-sky-700">4 kali luas lingkaran besar</strong> (<span class="font-mono-num text-sky-700">4 × πr²</span>). Saat dibentangkan, kulit bola menutup sempurna 4 lingkaran datar.
+                </p>
+                <button onclick="switchModeAndDemo('surface4', 100)" class="mt-1 w-full py-2.5 px-3.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-800 text-xs font-semibold flex items-center justify-center gap-2 transition shadow-sm">
+                    <i data-lucide="disc" class="w-3.5 h-3.5"></i> Buktikan 4 Lingkaran di 3D
+                </button>
+            </div>
+
+            <!-- Kartu Konsep 3: Volume & Percobaan Tuang Air -->
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-sm hover:border-amber-500/40 transition">
+                <div class="flex items-center gap-2 text-amber-700 text-xs font-bold uppercase tracking-wider">
+                    <div class="w-7 h-7 rounded-xl bg-amber-500/15 flex items-center justify-center">
+                        <i data-lucide="droplets" class="w-4 h-4"></i>
+                    </div>
+                    <span>3. Volume Bola = ⁴⁄₃πr³ (Tuang Air)</span>
+                </div>
+
+                <div class="space-y-2.5">
+                    <div class="text-xs font-semibold text-sky-900 flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-800 text-[10px] font-mono-num">Eksperimen</span>
+                        Percobaan Penuangan Air ke 2 Wadah Kerucut
+                    </div>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Jika 1 bola penuh air dituangkan ke dalam <strong class="text-amber-700">2 wadah kerucut</strong> (yang jari-jari alasnya <span class="font-mono-num text-emerald-700">r</span> dan tingginya setara diameter <span class="font-mono-num text-rose-600">t = 2r</span>), maka kedua kerucut akan <strong class="text-slate-900">terisi penuh tanpa sisa</strong>!
+                    </p>
+
+                    <div class="bg-slate-900 text-slate-100 border border-slate-800 rounded-xl p-3.5 font-mono-num text-[11px] space-y-1.5 shadow-inner">
+                        <div class="text-slate-400">// Penurunan Rumus Matematika:</div>
+                        <div>V Bola = 2 × V Kerucut</div>
+                        <div>V Bola = 2 × (⅓ × πr² × t)  <span class="text-slate-400">← ganti t = 2r</span></div>
+                        <div>V Bola = 2 × (⅓ × πr² × (2r))</div>
+                        <div>V Bola = <strong class="text-amber-400 text-xs">⁴⁄₃πr³</strong></div>
+                    </div>
+                </div>
+
+                <button onclick="switchModeAndDemo('volumeWater', 100)" class="mt-1 w-full py-2.5 px-3.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-800 text-xs font-semibold flex items-center justify-center gap-2 transition shadow-sm">
+                    <i data-lucide="droplets" class="w-3.5 h-3.5"></i> Mainkan Simulasi 3D Tuang Air
+                </button>
+            </div>
+
+            <!-- Kartu Konsep 4: Cara Mencari Jari-Jari (r) -->
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-sm hover:border-emerald-500/40 transition">
+                <div class="flex items-center gap-2 text-emerald-700 text-xs font-bold uppercase tracking-wider">
+                    <div class="w-7 h-7 rounded-xl bg-emerald-500/15 flex items-center justify-center">
+                        <i data-lucide="search" class="w-4 h-4"></i>
+                    </div>
+                    <span>4. Penjabaran Mengubah Rumus ke Jari-Jari (r)</span>
+                </div>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Berikut langkah-langkah aljabar untuk membalik rumus <strong>Volume ($V$)</strong> maupun rumus unsur lainnya agar mendapatkan panjang jari-jari (<span class="font-mono-num text-emerald-700 font-bold">r</span>):
+                </p>
+
+                <!-- Penjabaran Khusus Volume ke Jari-jari -->
+                <div class="bg-slate-900 text-slate-100 border border-slate-800 rounded-xl p-3.5 font-mono-num text-[11px] space-y-2 shadow-inner">
+                    <div class="text-rose-400 font-bold border-b border-slate-800 pb-1.5">A. Langkah Mengubah Rumus Volume (V) ke Jari-Jari (r):</div>
+                    <div class="space-y-1 text-slate-200">
+                        <div><span class="text-slate-400">Langkah 1 (Tulis rumus awal):</span><br>V = ⁴⁄₃ × π × r³</div>
+                        <div><span class="text-slate-400">Langkah 2 (Kalikan kedua ruas dengan 3):</span><br>3 × V = 4 × π × r³  ⇒  <strong>3V = 4πr³</strong></div>
+                        <div><span class="text-slate-400">Langkah 3 (Bagi kedua ruas dengan 4π):</span><br>r³ = 3V / (4π)</div>
+                        <div><span class="text-slate-400">Langkah 4 (Tarik akar pangkat tiga / ∛):</span><br><strong class="text-emerald-400 text-xs">r = ∛(3V / 4π)</strong></div>
+                    </div>
+
+                    <div class="text-sky-400 font-bold border-b border-slate-800 pb-1.5 pt-2">B. Jika Diketahui Unsur Lainnya:</div>
+                    <div class="space-y-1.5 text-slate-200">
+                        <div>• <strong>Dari Luas (L):</strong> L = 4πr² ⇒ r² = L / 4π ⇒ <strong class="text-amber-400">r = √(L / 4π)</strong></div>
+                        <div>• <strong>Dari Keliling (K):</strong> K = 2πr ⇒ <strong class="text-sky-400">r = K / (2π)</strong></div>
+                        <div>• <strong>Dari Diameter (d):</strong> d = 2r ⇒ <strong class="text-emerald-400">r = d / 2</strong></div>
+                    </div>
+                </div>
+
+                <button onclick="switchModeAndDemo('full', 55)" class="mt-1 w-full py-2.5 px-3.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-800 text-xs font-semibold flex items-center justify-center gap-2 transition shadow-sm">
+                    <i data-lucide="eye" class="w-3.5 h-3.5"></i> Lihat Garis Jari-Jari (r) di 3D
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- SCRIPT UTAMA THREE.JS & INTERAKSI -->
+    <script>
+        // Inisialisasi ikon Lucide
+        lucide.createIcons();
+
+        // --- STATE APLIKASI ---
+        const state = {
+            mode: 'full',          // 'full' | 'hemisphere' | 'surface4' | 'volumeWater'
+            explode: 0.45,         // 0.0 hingga 1.0
+            radiusCm: 7.0,         // 1.0 hingga 15.0 cm
+            autoRotate: true,
+            wireframe: false,
+            showLabels: true,
+            exactPiMode: false,
+            isUnfoldingAnim: false,
+            unfoldDirection: 1,
+            isPouringAnim: false,
+            pourDirection: 1,
+            showConesGuide: true
+        };
+
+        // --- SETUP THREE.JS ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xfbf9f5);
+
+        // Kamera Perspektif
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(6.5, 4.5, 8.5);
+
+        // Renderer dengan Antialias
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // OrbitControls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.minDistance = 3.5;
+        controls.maxDistance = 22;
+        controls.autoRotate = state.autoRotate;
+        controls.autoRotateSpeed = 1.4;
+
+        // --- PENCAHAYAAN STUDIO TERANG ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 0.95);
+        mainLight.position.set(8, 14, 10);
+        scene.add(mainLight);
+
+        const fillLight = new THREE.DirectionalLight(0xe0f2fe, 0.6);
+        fillLight.position.set(-10, -5, -8);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.PointLight(0xfef3c7, 0.6, 25);
+        rimLight.position.set(0, 8, -8);
+        scene.add(rimLight);
+
+        // Grid lantai kertas
+        const gridHelper = new THREE.GridHelper(16, 16, 0xcbd5e1, 0xe2e8f0);
+        gridHelper.position.y = -3.6;
+        scene.add(gridHelper);
+
+        // --- GRUP UTAMA BOLA ---
+        const masterSphereGroup = new THREE.Group();
+        scene.add(masterSphereGroup);
+
+        const BASE_VISUAL_RADIUS = 2.5;
+
+        // --- MATERIAL ---
+        const outerShellMat = new THREE.MeshPhysicalMaterial({
+            color: 0x0284c7,
+            emissive: 0x0369a1,
+            emissiveIntensity: 0.1,
+            roughness: 0.2,
+            metalness: 0.05,
+            transparent: true,
+            opacity: 0.5,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+
+        const solidHemiMat = new THREE.MeshPhysicalMaterial({
+            color: 0x0284c7,
+            roughness: 0.25,
+            metalness: 0.05,
+            side: THREE.FrontSide
+        });
+
+        const innerSliceMat = new THREE.MeshStandardMaterial({
+            color: 0x38bdf8,
+            emissive: 0x0284c7,
+            emissiveIntensity: 0.2,
+            roughness: 0.4,
+            side: THREE.DoubleSide
+        });
+
+        // --- 1. ELEMEN INTI ---
+        const coreGroup = new THREE.Group();
+        masterSphereGroup.add(coreGroup);
+
+        const centerDotGeo = new THREE.SphereGeometry(0.11, 24, 24);
+        const centerDotMat = new THREE.MeshBasicMaterial({ color: 0xd97706 });
+        const centerDot = new THREE.Mesh(centerDotGeo, centerDotMat);
+        coreGroup.add(centerDot);
+
+        function createTubeLine(p1, p2, radius, color) {
+            const dir = new THREE.Vector3().subVectors(p2, p1);
+            const len = dir.length();
+            const geo = new THREE.CylinderGeometry(radius, radius, len, 16);
+            const mat = new THREE.MeshBasicMaterial({ color: color });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(p1).add(dir.multiplyScalar(0.5));
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+            return mesh;
+        }
+
+        const diameterLine = createTubeLine(
+            new THREE.Vector3(-BASE_VISUAL_RADIUS, 0, 0),
+            new THREE.Vector3(BASE_VISUAL_RADIUS, 0, 0),
+            0.032,
+            0xe11d48
+        );
+        coreGroup.add(diameterLine);
+
+        const endDotGeo = new THREE.SphereGeometry(0.075, 16, 16);
+        const endDotMat = new THREE.MeshBasicMaterial({ color: 0xe11d48 });
+        const dDot1 = new THREE.Mesh(endDotGeo, endDotMat);
+        dDot1.position.set(-BASE_VISUAL_RADIUS, 0, 0);
+        const dDot2 = new THREE.Mesh(endDotGeo, endDotMat);
+        dDot2.position.set(BASE_VISUAL_RADIUS, 0, 0);
+        coreGroup.add(dDot1, dDot2);
+
+        const radiusEndPoint = new THREE.Vector3(0, BASE_VISUAL_RADIUS * 0.707, BASE_VISUAL_RADIUS * 0.707);
+        const radiusLine = createTubeLine(
+            new THREE.Vector3(0, 0, 0),
+            radiusEndPoint,
+            0.04,
+            0x059669
+        );
+        const rDot = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 16), new THREE.MeshBasicMaterial({ color: 0x059669 }));
+        rDot.position.copy(radiusEndPoint);
+        coreGroup.add(radiusLine, rDot);
+
+        const equatorGeo = new THREE.TorusGeometry(BASE_VISUAL_RADIUS + 0.015, 0.028, 16, 100);
+        const equatorMat = new THREE.MeshBasicMaterial({ color: 0x0284c7 });
+        const equatorRing = new THREE.Mesh(equatorGeo, equatorMat);
+        equatorRing.rotation.x = Math.PI / 2;
+        coreGroup.add(equatorRing);
+
+        // --- 2. BOLA UTUH ---
+        const fullSphereGroup = new THREE.Group();
+        masterSphereGroup.add(fullSphereGroup);
+
+        const fullSphereGeo = new THREE.SphereGeometry(BASE_VISUAL_RADIUS, 64, 48);
+        const fullSphereMesh = new THREE.Mesh(fullSphereGeo, outerShellMat);
+        fullSphereGroup.add(fullSphereMesh);
+
+        const wireGeo = new THREE.WireframeGeometry(new THREE.SphereGeometry(BASE_VISUAL_RADIUS + 0.005, 24, 16));
+        const wireMat = new THREE.LineBasicMaterial({ color: 0x0284c7, transparent: true, opacity: 0.22 });
+        const fullSphereLines = new THREE.LineSegments(wireGeo, wireMat);
+        fullSphereGroup.add(fullSphereLines);
+
+        // --- 3. MODE 3: LUAS 4πr² ---
+        const surface4Group = new THREE.Group();
+        surface4Group.visible = false;
+        masterSphereGroup.add(surface4Group);
+
+        const surface4Config = [
+            { name: 'Lingkaran 1', color: 0x0284c7, emissive: 0x0369a1, phiStart: 0, targetPos: new THREE.Vector3(-2.75, -1.25, -2.75) },
+            { name: 'Lingkaran 2', color: 0x059669, emissive: 0x047857, phiStart: Math.PI * 0.5, targetPos: new THREE.Vector3(2.75, -1.25, -2.75) },
+            { name: 'Lingkaran 3', color: 0xd97706, emissive: 0xb45309, phiStart: Math.PI, targetPos: new THREE.Vector3(-2.75, -1.25, 2.75) },
+            { name: 'Lingkaran 4', color: 0xe11d48, emissive: 0xbe123c, phiStart: Math.PI * 1.5, targetPos: new THREE.Vector3(2.75, -1.25, 2.75) }
+        ];
+
+        const surface4Quarters = [];
+        const RADIAL_SEGMENTS = 48;
+        const RING_SEGMENTS = 32;
+
+        surface4Config.forEach((cfg) => {
+            const quarterGroup = new THREE.Group();
+            const vertexCount = (RING_SEGMENTS + 1) * (RADIAL_SEGMENTS + 1);
+            const spherePositions = new Float32Array(vertexCount * 3);
+            const diskPositions = new Float32Array(vertexCount * 3);
+            const currentPositions = new Float32Array(vertexCount * 3);
+            const indices = [];
+
+            let ptr = 0;
+            for (let i = 0; i <= RING_SEGMENTS; i++) {
+                const u = i / RING_SEGMENTS;
+                for (let j = 0; j <= RADIAL_SEGMENTS; j++) {
+                    const v = j / RADIAL_SEGMENTS;
+
+                    const diskAngle = v * Math.PI * 2;
+                    const diskRadius = u * BASE_VISUAL_RADIUS;
+                    const dx = cfg.targetPos.x + diskRadius * Math.cos(diskAngle);
+                    const dy = cfg.targetPos.y;
+                    const dz = cfg.targetPos.z + diskRadius * Math.sin(diskAngle);
+
+                    diskPositions[ptr] = dx;
+                    diskPositions[ptr + 1] = dy;
+                    diskPositions[ptr + 2] = dz;
+
+                    const midPhi = cfg.phiStart + Math.PI / 4;
+                    const midTheta = Math.PI / 2;
+
+                    const cosA = Math.cos(diskAngle);
+                    const sinA = Math.sin(diskAngle);
+                    const maxComp = Math.max(Math.abs(cosA), Math.abs(sinA), 1e-6);
+
+                    const sqX = u * (cosA / maxComp);
+                    const sqY = u * (sinA / maxComp);
+
+                    const theta = midTheta - sqY * (Math.PI / 2);
+                    const phi = midPhi + sqX * (Math.PI / 4);
+
+                    const sx = -BASE_VISUAL_RADIUS * Math.cos(phi) * Math.sin(theta);
+                    const sy = BASE_VISUAL_RADIUS * Math.cos(theta);
+                    const sz = BASE_VISUAL_RADIUS * Math.sin(phi) * Math.sin(theta);
+
+                    spherePositions[ptr] = sx;
+                    spherePositions[ptr + 1] = sy;
+                    spherePositions[ptr + 2] = sz;
+
+                    currentPositions[ptr] = sx;
+                    currentPositions[ptr + 1] = sy;
+                    currentPositions[ptr + 2] = sz;
+
+                    ptr += 3;
+                }
+            }
+
+            for (let i = 0; i < RING_SEGMENTS; i++) {
+                for (let j = 0; j < RADIAL_SEGMENTS; j++) {
+                    const a = i * (RADIAL_SEGMENTS + 1) + j;
+                    const b = a + 1;
+                    const c = (i + 1) * (RADIAL_SEGMENTS + 1) + j;
+                    const d = c + 1;
+                    indices.push(a, c, b);
+                    indices.push(b, c, d);
+                }
+            }
+
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.BufferAttribute(currentPositions, 3));
+            geo.setIndex(indices);
+            geo.computeVertexNormals();
+            geo.computeBoundingSphere();
+            geo.computeBoundingBox();
+
+            const mat = new THREE.MeshPhysicalMaterial({
+                color: cfg.color,
+                emissive: cfg.emissive,
+                emissiveIntensity: 0.15,
+                roughness: 0.25,
+                metalness: 0.05,
+                side: THREE.DoubleSide
+            });
+
+            const mesh = new THREE.Mesh(geo, mat);
+            quarterGroup.add(mesh);
+
+            const targetGuideGroup = new THREE.Group();
+            targetGuideGroup.position.copy(cfg.targetPos);
+            targetGuideGroup.position.y -= 0.015;
+
+            const ringGeo = new THREE.RingGeometry(BASE_VISUAL_RADIUS - 0.04, BASE_VISUAL_RADIUS + 0.02, 64);
+            const ringMat = new THREE.MeshBasicMaterial({ color: cfg.color, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.rotation.x = -Math.PI / 2;
+            targetGuideGroup.add(ringMesh);
+
+            const rBarGeo = new THREE.PlaneGeometry(BASE_VISUAL_RADIUS, 0.055);
+            const rBarMat = new THREE.MeshBasicMaterial({ color: 0x334155, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+            const rBarMesh = new THREE.Mesh(rBarGeo, rBarMat);
+            rBarMesh.rotation.x = -Math.PI / 2;
+            rBarMesh.position.set(BASE_VISUAL_RADIUS / 2, 0.025, 0);
+            targetGuideGroup.add(rBarMesh);
+
+            const dotGeo = new THREE.CircleGeometry(0.09, 20);
+            const dotMesh = new THREE.Mesh(dotGeo, rBarMat);
+            dotMesh.rotation.x = -Math.PI / 2;
+            dotMesh.position.y = 0.025;
+            targetGuideGroup.add(dotMesh);
+
+            surface4Group.add(quarterGroup, targetGuideGroup);
+
+            surface4Quarters.push({
+                geometry: geo,
+                material: mat,
+                spherePositions,
+                diskPositions,
+                currentPositions,
+                targetPos: cfg.targetPos,
+                guideGroup: targetGuideGroup
+            });
+        });
+
+        // --- 4. MODE 2: BELAH BOLA ---
+        const hemisphereGroup = new THREE.Group();
+        hemisphereGroup.visible = false;
+        masterSphereGroup.add(hemisphereGroup);
+
+        const topHemiGroup = new THREE.Group();
+        const topDomeGeo = new THREE.SphereGeometry(BASE_VISUAL_RADIUS, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2);
+        const topDomeMesh = new THREE.Mesh(topDomeGeo, solidHemiMat);
+        const capGeo = new THREE.CircleGeometry(BASE_VISUAL_RADIUS, 64);
+        const topCapMesh = new THREE.Mesh(capGeo, innerSliceMat);
+        topCapMesh.rotation.x = Math.PI / 2;
+        const capRingGeo = new THREE.RingGeometry(BASE_VISUAL_RADIUS - 0.05, BASE_VISUAL_RADIUS, 64);
+        const capRingMat = new THREE.MeshBasicMaterial({ color: 0xd97706, side: THREE.DoubleSide });
+        const topCapRing = new THREE.Mesh(capRingGeo, capRingMat);
+        topCapRing.rotation.x = Math.PI / 2;
+        topCapRing.position.y = -0.005;
+        topHemiGroup.add(topDomeMesh, topCapMesh, topCapRing);
+
+        const botHemiGroup = new THREE.Group();
+        const botDomeGeo = new THREE.SphereGeometry(BASE_VISUAL_RADIUS, 64, 32, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+        const botDomeMesh = new THREE.Mesh(botDomeGeo, solidHemiMat);
+        const botCapMesh = new THREE.Mesh(capGeo, innerSliceMat);
+        botCapMesh.rotation.x = -Math.PI / 2;
+        const botCapRing = new THREE.Mesh(capRingGeo, capRingMat);
+        botCapRing.rotation.x = -Math.PI / 2;
+        botCapRing.position.y = 0.005;
+        botHemiGroup.add(botDomeMesh, botCapMesh, botCapRing);
+
+        hemisphereGroup.add(topHemiGroup, botHemiGroup);
+
+        // --- 5. MODE 4: VOLUME AIR KE 2 KERUCUT ---
+        const volumeWaterGroup = new THREE.Group();
+        volumeWaterGroup.visible = false;
+        masterSphereGroup.add(volumeWaterGroup);
+
+        const R_SIM = BASE_VISUAL_RADIUS * 0.72;
+        const H_CONE = R_SIM * 2;
+        const BASE_Y = -R_SIM;
+
+        const waterBallHolder = new THREE.Group();
+        waterBallHolder.position.set(-2.85, 0.35, 0);
+        volumeWaterGroup.add(waterBallHolder);
+
+        const glassBallGeo = new THREE.SphereGeometry(R_SIM, 48, 36);
+        const glassBallMat = new THREE.MeshPhysicalMaterial({
+            color: 0x93c5fd,
+            roughness: 0.1,
+            metalness: 0.05,
+            transparent: true,
+            opacity: 0.32,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        const glassBallMesh = new THREE.Mesh(glassBallGeo, glassBallMat);
+        waterBallHolder.add(glassBallMesh);
+
+        const ballRingGeo = new THREE.TorusGeometry(R_SIM + 0.01, 0.022, 12, 64);
+        const ballRingMat = new THREE.MeshBasicMaterial({ color: 0x0284c7 });
+        const ballRingMesh = new THREE.Mesh(ballRingGeo, ballRingMat);
+        ballRingMesh.rotation.x = Math.PI / 2;
+        waterBallHolder.add(ballRingMesh);
+
+        const ballClipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), R_SIM + 0.35);
+        const waterInBallMat = new THREE.MeshPhysicalMaterial({
+            color: 0x0284c7,
+            emissive: 0x0369a1,
+            emissiveIntensity: 0.2,
+            roughness: 0.15,
+            metalness: 0.05,
+            transparent: true,
+            opacity: 0.82,
+            side: THREE.DoubleSide,
+            clippingPlanes: [ballClipPlane]
+        });
+        const waterInBallMesh = new THREE.Mesh(new THREE.SphereGeometry(R_SIM * 0.975, 48, 36), waterInBallMat);
+        waterBallHolder.add(waterInBallMesh);
+
+        const ballWaterCapGeo = new THREE.CircleGeometry(1, 48);
+        const ballWaterCapMat = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide
+        });
+        const ballWaterCapMesh = new THREE.Mesh(ballWaterCapGeo, ballWaterCapMat);
+        ballWaterCapMesh.rotation.x = -Math.PI / 2;
+        waterBallHolder.add(ballWaterCapMesh);
+
+        const streamCurve1 = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(-1.85, 1.55, 0),
+            new THREE.Vector3(-0.95, 2.25, 0),
+            new THREE.Vector3(-0.25, 1.95, 0),
+            new THREE.Vector3(0.15, 0.85, 0)
+        ]);
+        const streamGeo1 = new THREE.TubeGeometry(streamCurve1, 32, 0.075, 12, false);
+
+        const streamCurve2 = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(-1.45, 1.65, 0),
+            new THREE.Vector3(0.45, 2.55, 0),
+            new THREE.Vector3(2.35, 2.15, 0),
+            new THREE.Vector3(3.15, 0.85, 0)
+        ]);
+        const streamGeo2 = new THREE.TubeGeometry(streamCurve2, 32, 0.075, 12, false);
+
+        const streamMat = new THREE.MeshPhysicalMaterial({
+            color: 0x0284c7,
+            emissive: 0x0369a1,
+            emissiveIntensity: 0.35,
+            transparent: true,
+            opacity: 0.88,
+            roughness: 0.1
+        });
+        const waterStreamMesh1 = new THREE.Mesh(streamGeo1, streamMat);
+        const waterStreamMesh2 = new THREE.Mesh(streamGeo2, streamMat);
+        waterStreamMesh1.visible = false;
+        waterStreamMesh2.visible = false;
+        volumeWaterGroup.add(waterStreamMesh1, waterStreamMesh2);
+
+        const dimensionGuidesGroup = new THREE.Group();
+        volumeWaterGroup.add(dimensionGuidesGroup);
+
+        function create3DTextTexture(message, colorHex) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 256;
+            canvas.height = 128;
+            context.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            context.strokeStyle = colorHex;
+            context.lineWidth = 8;
+            context.beginPath();
+            context.roundRect(8, 16, 240, 96, 24);
+            context.fill();
+            context.stroke();
+
+            context.font = 'bold 32px "JetBrains Mono", monospace';
+            context.fillStyle = colorHex;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(message, 128, 64);
+            return canvas;
+        }
+
+        function create3DTextSprite(message, colorHex) {
+            const texture = new THREE.CanvasTexture(create3DTextTexture(message, colorHex));
+            const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(1.2, 0.6, 1);
+            return sprite;
+        }
+
+        const spriteBallR = create3DTextSprite('r = 7.0 cm', '#0284c7');
+        const spriteConeR = create3DTextSprite('r = 7.0 cm', '#059669');
+        const spriteConeT = create3DTextSprite('t = 14.0 cm', '#e11d48');
+        dimensionGuidesGroup.add(spriteBallR, spriteConeR, spriteConeT);
+
+        function createConeVessel(xPos, accentColor) {
+            const holder = new THREE.Group();
+            holder.position.set(xPos, 0, 0);
+
+            const coneGlassGeo = new THREE.ConeGeometry(R_SIM, H_CONE, 48, 1, true);
+            coneGlassGeo.rotateX(Math.PI);
+            const coneGlassMat = new THREE.MeshPhysicalMaterial({
+                color: 0x93c5fd,
+                roughness: 0.1,
+                metalness: 0.05,
+                transparent: true,
+                opacity: 0.28,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const coneGlassMesh = new THREE.Mesh(coneGlassGeo, coneGlassMat);
+            holder.add(coneGlassMesh);
+
+            const rimGeo = new THREE.TorusGeometry(R_SIM + 0.015, 0.028, 12, 64);
+            const rimMat = new THREE.MeshBasicMaterial({ color: accentColor });
+            const rimMesh = new THREE.Mesh(rimGeo, rimMat);
+            rimMesh.rotation.x = Math.PI / 2;
+            rimMesh.position.y = BASE_Y + H_CONE;
+            holder.add(rimMesh);
+
+            const waterConeGeo = new THREE.ConeGeometry(R_SIM * 0.975, H_CONE * 0.985, 48, 1, false);
+            waterConeGeo.rotateX(Math.PI);
+            waterConeGeo.translate(0, (H_CONE * 0.985) / 2, 0);
+
+            const waterConeMat = new THREE.MeshPhysicalMaterial({
+                color: 0x0284c7,
+                emissive: 0x0369a1,
+                emissiveIntensity: 0.2,
+                roughness: 0.15,
+                transparent: true,
+                opacity: 0.8
+            });
+            const waterConeMesh = new THREE.Mesh(waterConeGeo, waterConeMat);
+            waterConeMesh.position.y = BASE_Y + 0.015;
+            holder.add(waterConeMesh);
+
+            return { holder, coneGlassMat, waterConeMesh };
+        }
+
+        const coneVessel1 = createConeVessel(0.15, 0x059669);
+        const coneVessel2 = createConeVessel(3.15, 0xd97706);
+        volumeWaterGroup.add(coneVessel1.holder, coneVessel2.holder);
+
+        const lblBallR = document.getElementById('lbl-ball-r');
+        const lblConeR = document.getElementById('lbl-cone-r');
+        const lblConeT = document.getElementById('lbl-cone-t');
+
+        renderer.localClippingEnabled = true;
+
+        // --- UPDATE 3D SCENE ---
+        function update3DScene() {
+            const r = state.radiusCm;
+            const d = r * 2;
+            const scaleFactor = r / 7.0;
+            masterSphereGroup.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+            const p = state.explode;
+
+            coreGroup.visible = (state.mode === 'full' || state.mode === 'hemisphere');
+            fullSphereGroup.visible = (state.mode === 'full');
+            surface4Group.visible = (state.mode === 'surface4');
+            hemisphereGroup.visible = (state.mode === 'hemisphere');
+            volumeWaterGroup.visible = (state.mode === 'volumeWater');
+
+            const rFormatted = r.toFixed(1).replace('.', ',') + ' cm';
+            const dFormatted = d.toFixed(1).replace('.', ',') + ' cm';
+            lblBallR.textContent = `r = ${rFormatted}`;
+            lblConeR.textContent = `r = ${rFormatted}`;
+            lblConeT.textContent = `t = ${dFormatted}`;
+
+            if (state.mode === 'full') {
+                outerShellMat.opacity = 0.2 + (1 - p) * 0.6;
+                fullSphereGroup.position.set(0, 0, 0);
+            } else if (state.mode === 'hemisphere') {
+                outerShellMat.opacity = 0.55;
+                const shift = p * 2.2;
+                topHemiGroup.position.set(0, shift, 0);
+                botHemiGroup.position.set(0, -shift, 0);
+            } else if (state.mode === 'surface4') {
+                const easeP = p * p * (3 - 2 * p);
+                surface4Quarters.forEach(q => {
+                    const currentPos = q.geometry.attributes.position.array;
+                    const sph = q.spherePositions;
+                    const dsk = q.diskPositions;
+                    for (let i = 0; i < sph.length; i++) {
+                        currentPos[i] = sph[i] + (dsk[i] - sph[i]) * easeP;
+                    }
+                    q.geometry.attributes.position.needsUpdate = true;
+                    q.geometry.computeBoundingSphere();
+                });
+                surface4Quarters.forEach(q => {
+                    q.guideGroup.visible = (p > 0.35);
+                });
+            } else if (state.mode === 'volumeWater') {
+                coreGroup.visible = false;
+                const pouringTo1 = (p > 0.01 && p <= 0.5);
+                const pouringTo2 = (p > 0.5 && p < 0.99);
+                const subPhase = pouringTo1 ? (p / 0.5) : (pouringTo2 ? ((p - 0.5) / 0.5) : 0);
+
+                const liftY = 0.35 + Math.sin(subPhase * Math.PI) * 1.15;
+                const tiltZ = -Math.sin(subPhase * Math.PI) * 0.72;
+                const shiftX = -2.85 + Math.sin(subPhase * Math.PI) * (pouringTo2 ? 0.75 : 0.35);
+
+                waterBallHolder.position.set(shiftX, liftY, 0);
+                waterBallHolder.rotation.z = tiltZ;
+
+                const remFrac = Math.max(0, 1 - p);
+                const localWaterY = -R_SIM + remFrac * (2 * R_SIM);
+                const worldWaterY = (liftY + localWaterY) * scaleFactor;
+                ballClipPlane.constant = worldWaterY;
+
+                waterInBallMesh.visible = remFrac > 0.01;
+                if (remFrac > 0.01 && remFrac < 0.99) {
+                    const sliceR = Math.sqrt(Math.max(0.001, R_SIM * R_SIM - localWaterY * localWaterY)) * 0.97;
+                    ballWaterCapMesh.visible = true;
+                    ballWaterCapMesh.position.set(0, localWaterY, 0);
+                    ballWaterCapMesh.rotation.set(-Math.PI / 2, 0, -tiltZ);
+                    ballWaterCapMesh.scale.set(sliceR, sliceR, 1);
+                } else {
+                    ballWaterCapMesh.visible = false;
+                }
+
+                waterStreamMesh1.visible = pouringTo1;
+                waterStreamMesh2.visible = pouringTo2;
+
+                const cone1VolFrac = Math.min(1, Math.max(0, p * 2));
+                const cone2VolFrac = Math.min(1, Math.max(0, (p - 0.5) * 2));
+
+                const s1 = Math.cbrt(cone1VolFrac);
+                coneVessel1.waterConeMesh.scale.set(s1, s1, s1);
+                coneVessel1.waterConeMesh.visible = true;
+
+                const s2 = Math.cbrt(cone2VolFrac);
+                coneVessel2.waterConeMesh.scale.set(s2, s2, s2);
+                coneVessel2.waterConeMesh.visible = true;
+
+                dimensionGuidesGroup.visible = state.showConesGuide;
+
+                const showDim = state.showLabels && state.showConesGuide;
+                if (showDim) {
+                    lblBallR.style.opacity = '1';
+                    lblConeR.style.opacity = '1';
+                    lblConeT.style.opacity = '1';
+
+                    const pBall = new THREE.Vector3(-2.85 + R_SIM * 0.5, 0.35 + R_SIM * 0.3, 0).applyMatrix4(masterSphereGroup.matrixWorld);
+                    const pConeR = new THREE.Vector3(0.15 + R_SIM * 0.5, BASE_Y + H_CONE + 0.15, 0).applyMatrix4(masterSphereGroup.matrixWorld);
+                    const pConeT = new THREE.Vector3(0.15 + R_SIM + 0.35, BASE_Y + H_CONE * 0.5, 0).applyMatrix4(masterSphereGroup.matrixWorld);
+
+                    const proj1 = pBall.project(camera);
+                    const proj2 = pConeR.project(camera);
+                    const proj3 = pConeT.project(camera);
+
+                    if (proj1.z <= 1) {
+                        lblBallR.style.left = `${(proj1.x * 0.5 + 0.5) * container.clientWidth}px`;
+                        lblBallR.style.top = `${(proj1.y * -0.5 + 0.5) * container.clientHeight}px`;
+                    }
+                    if (proj2.z <= 1) {
+                        lblConeR.style.left = `${(proj2.x * 0.5 + 0.5) * container.clientWidth}px`;
+                        lblConeR.style.top = `${(proj2.y * -0.5 + 0.5) * container.clientHeight}px`;
+                    }
+                    if (proj3.z <= 1) {
+                        lblConeT.style.left = `${(proj3.x * 0.5 + 0.5) * container.clientWidth}px`;
+                        lblConeT.style.top = `${(proj3.y * -0.5 + 0.5) * container.clientHeight}px`;
+                    }
+                } else {
+                    lblBallR.style.opacity = '0';
+                    lblConeR.style.opacity = '0';
+                    lblConeT.style.opacity = '0';
+                }
+
+                const totalBallVol = (4 / 3) * Math.PI * Math.pow(r, 3);
+                const currentBallVol = totalBallVol * remFrac;
+                const coneCapacity = totalBallVol / 2;
+                const currentCone1Vol = coneCapacity * cone1VolFrac;
+                const currentCone2Vol = coneCapacity * cone2VolFrac;
+
+                const formatMlOrL = (cm3) => {
+                    if (cm3 >= 1000) {
+                        return `${(cm3 / 1000).toFixed(2).replace('.', ',')} L`;
+                    }
+                    return `${Math.round(cm3)} ml`;
+                };
+
+                const ballPctEl = document.getElementById('water-ball-pct');
+                const cone1PctEl = document.getElementById('water-cone1-pct');
+                const cone2PctEl = document.getElementById('water-cone2-pct');
+                if (ballPctEl && cone1PctEl && cone2PctEl) {
+                    ballPctEl.innerHTML = `${Math.round(remFrac * 100)}%<br><span class="text-[9px] text-slate-500 font-normal">(${formatMlOrL(currentBallVol)})</span>`;
+                    cone1PctEl.innerHTML = cone1VolFrac >= 0.99 ? `100%<br><span class="text-[9px] text-emerald-600 font-normal">(${formatMlOrL(coneCapacity)})</span>` : `${Math.round(cone1VolFrac * 100)}%<br><span class="text-[9px] text-slate-500 font-normal">(${formatMlOrL(currentCone1Vol)})</span>`;
+                    cone2PctEl.innerHTML = cone2VolFrac >= 0.99 ? `100%<br><span class="text-[9px] text-amber-600 font-normal">(${formatMlOrL(coneCapacity)})</span>` : `${Math.round(cone2VolFrac * 100)}%<br><span class="text-[9px] text-slate-500 font-normal">(${formatMlOrL(currentCone2Vol)})</span>`;
+                }
+            } else {
+                lblBallR.style.opacity = '0';
+                lblConeR.style.opacity = '0';
+                lblConeT.style.opacity = '0';
+            }
+
+            outerShellMat.wireframe = state.wireframe;
+            solidHemiMat.wireframe = state.wireframe;
+            surface4Quarters.forEach(q => { q.material.wireframe = state.wireframe; });
+            glassBallMat.wireframe = state.wireframe;
+            coneVessel1.coneGlassMat.wireframe = state.wireframe;
+            coneVessel2.coneGlassMat.wireframe = state.wireframe;
+        }
+
+        // --- KALKULATOR REAL-TIME ---
+        function formatNum(num) {
+            return num.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function updateCalculations() {
+            const r = state.radiusCm;
+            const d = r * 2;
+            const pi = Math.PI;
+
+            const surfaceArea = 4 * pi * r * r;
+            const volume = (4 / 3) * pi * Math.pow(r, 3);
+            const circumference = 2 * pi * r;
+            const crossArea = pi * r * r;
+
+            document.getElementById('display-radius').textContent = `${r.toFixed(1).replace('.', ',')} cm`;
+            document.getElementById('display-diameter').textContent = `${d.toFixed(1).replace('.', ',')} cm`;
+
+            if (!state.exactPiMode) {
+                document.getElementById('val-surface-area').textContent = `${formatNum(surfaceArea)} cm²`;
+                document.getElementById('val-volume').textContent = `${formatNum(volume)} cm³`;
+                document.getElementById('val-circumference').textContent = `${formatNum(circumference)} cm`;
+                document.getElementById('val-cross-area').textContent = `${formatNum(crossArea)} cm²`;
+            } else {
+                document.getElementById('val-surface-area').textContent = `${formatNum(4 * r * r)}π cm²`;
+                document.getElementById('val-volume').textContent = `${formatNum((4 / 3) * Math.pow(r, 3))}π cm³`;
+                document.getElementById('val-circumference').textContent = `${formatNum(2 * r)}π cm`;
+                document.getElementById('val-cross-area').textContent = `${formatNum(r * r)}π cm²`;
+            }
+
+            const rStr = r % 1 === 0 ? r.toString() : r.toFixed(1).replace('.', ',');
+            document.getElementById('step-surface-area').textContent = `4 × π × ${rStr}²`;
+            document.getElementById('step-volume').textContent = `⁴⁄₃ × π × ${rStr}³`;
+            document.getElementById('step-circumference').textContent = `2 × π × ${rStr}`;
+            document.getElementById('step-cross-area').textContent = `π × ${rStr}² (¼ Luas)`;
+
+            // Update Kartu Kalkulator Balik Mencari Jari-Jari (r) beserta Penjabaran Langkah
+            const formulaMode = document.getElementById('select-radius-formula')?.value || 'volume';
+            const symEl = document.getElementById('radius-formula-symbolic');
+            const derivEl = document.getElementById('radius-formula-derivation');
+            const stepEl = document.getElementById('radius-formula-step');
+            const resEl = document.getElementById('radius-formula-result');
+
+            if (symEl && derivEl && stepEl && resEl) {
+                if (formulaMode === 'volume') {
+                    symEl.textContent = 'r = ∛(3V ÷ 4π)';
+                    derivEl.innerHTML = `
+                        <div class="text-slate-400">// Langkah mengubah V menjadi r:</div>
+                        <div>1. V = (4/3) × π × r³</div>
+                        <div>2. 3V = 4 × π × r³  <span class="text-slate-400">(kedua ruas × 3)</span></div>
+                        <div>3. r³ = 3V ÷ (4π)   <span class="text-slate-400">(pindah ruas 4π)</span></div>
+                        <div class="text-emerald-400 font-bold">4. r = ∛(3V ÷ 4π)</div>
+                    `;
+                    stepEl.textContent = state.exactPiMode
+                        ? `Hitung: r = ∛(3 × ${formatNum((4 / 3) * Math.pow(r, 3))}π ÷ 4π) = ∛${formatNum(Math.pow(r, 3))}`
+                        : `Hitung: r = ∛(3 × ${formatNum(volume)} ÷ 4π)`;
+                } else if (formulaMode === 'surface') {
+                    symEl.textContent = 'r = √(L ÷ 4π)';
+                    derivEl.innerHTML = `
+                        <div class="text-slate-400">// Langkah mengubah L menjadi r:</div>
+                        <div>1. L = 4 × π × r²</div>
+                        <div>2. r² = L ÷ (4π)    <span class="text-slate-400">(pindah ruas 4π)</span></div>
+                        <div class="text-emerald-400 font-bold">3. r = √(L ÷ 4π)    <span class="text-slate-400">(tarik akar kuadrat)</span></div>
+                    `;
+                    stepEl.textContent = state.exactPiMode
+                        ? `Hitung: r = √(${formatNum(4 * r * r)}π ÷ 4π) = √${formatNum(r * r)}`
+                        : `Hitung: r = √(${formatNum(surfaceArea)} ÷ 4π)`;
+                } else if (formulaMode === 'circumference') {
+                    symEl.textContent = 'r = K ÷ (2π)';
+                    derivEl.innerHTML = `
+                        <div class="text-slate-400">// Langkah mengubah K menjadi r:</div>
+                        <div>1. K = 2 × π × r</div>
+                        <div class="text-emerald-400 font-bold">2. r = K ÷ (2π)     <span class="text-slate-400">(pindah ruas 2π)</span></div>
+                    `;
+                    stepEl.textContent = state.exactPiMode
+                        ? `Hitung: r = ${formatNum(2 * r)}π ÷ 2π`
+                        : `Hitung: r = ${formatNum(circumference)} ÷ (2 × 3,14)`;
+                } else if (formulaMode === 'diameter') {
+                    symEl.textContent = 'r = d ÷ 2';
+                    derivEl.innerHTML = `
+                        <div class="text-slate-400">// Langkah mengubah d menjadi r:</div>
+                        <div>1. d = 2 × r        <span class="text-slate-400">(diameter = 2 jari-jari)</span></div>
+                        <div class="text-emerald-400 font-bold">2. r = d ÷ 2        <span class="text-slate-400">(bagi kedua ruas dgn 2)</span></div>
+                    `;
+                    stepEl.textContent = `Hitung: r = ${d.toFixed(1).replace('.', ',')} ÷ 2`;
+                }
+                resEl.textContent = `r = ${formatNum(r)} cm`;
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+        const sliderExplode = document.getElementById('slider-explode');
+        const explodeValBadge = document.getElementById('explode-value-badge');
+        const explodeTitleText = document.getElementById('explode-title-text');
+        const explodeHint = document.getElementById('explode-hint');
+        const surface4QuickActions = document.getElementById('surface4-quick-actions');
+        const volumeWaterQuickActions = document.getElementById('volume-water-quick-actions');
+
+        function setMode(newMode) {
+            state.mode = newMode;
+            state.isUnfoldingAnim = false;
+            state.isPouringAnim = false;
+            updateUnfoldButtonUI();
+            updatePourButtonUI();
+
+            document.querySelectorAll('.mode-card').forEach(btn => {
+                if (btn.dataset.mode === newMode) {
+                    btn.classList.add('active', 'border-sky-500', 'bg-sky-500/15', 'text-sky-200');
+                    btn.classList.remove('border-slate-800', 'bg-slate-900/80', 'text-slate-300');
+                } else {
+                    btn.classList.remove('active', 'border-sky-500', 'bg-sky-500/15', 'text-sky-200');
+                    btn.classList.add('border-slate-800', 'bg-slate-900/80', 'text-slate-300');
+                }
+            });
+
+            if (newMode === 'surface4') {
+                surface4QuickActions.classList.remove('hidden');
+            } else {
+                surface4QuickActions.classList.add('hidden');
+            }
+
+            if (newMode === 'volumeWater') {
+                volumeWaterQuickActions.classList.remove('hidden');
+            } else {
+                volumeWaterQuickActions.classList.add('hidden');
+            }
+
+            if (newMode === 'full') {
+                explodeTitleText.textContent = 'Transparansi Kulit Bola';
+                explodeHint.textContent = 'Geser untuk menembus kulit luar bola dan mengamati posisi titik pusat (O), jari-jari (r), dan diameter (d).';
+            } else if (newMode === 'hemisphere') {
+                explodeTitleText.textContent = 'Jarak Belahan Bola (Irisan)';
+                explodeHint.textContent = 'Membelah bola menjadi dua bagian sama besar untuk melihat penampang Lingkaran Besar (Luas = πr²).';
+                if (state.explode < 0.25) {
+                    state.explode = 0.55;
+                    sliderExplode.value = 55;
+                    explodeValBadge.textContent = '55%';
+                }
+            } else if (newMode === 'surface4') {
+                explodeTitleText.textContent = 'Kupas & Bentangkan ke 4 Lingkaran';
+                explodeHint.textContent = 'Geser 0% → 100% untuk melihat 4 bagian kulit bola mengelupas dan merata menjadi 4 lingkaran datar berjari-jari r (Total Luas = 4 × πr²).';
+                camera.position.set(0, 9.5, 11.5);
+                controls.target.set(0, -0.6, 0);
+                if (state.autoRotate) btnAutoRotate.click();
+            } else if (newMode === 'volumeWater') {
+                explodeTitleText.textContent = 'Tuang Air Bola ke 2 Wadah Kerucut (t = 2r)';
+                explodeHint.textContent = 'Geser 0% → 50% mengisi Kerucut 1, lalu 50% → 100% mengisi Kerucut 2 hingga penuh! Terbukti V Bola = 2 × V Kerucut = ⁴⁄₃πr³.';
+                camera.position.set(0.15, 2.3, 11.2);
+                controls.target.set(0.15, 0.1, 0);
+                if (state.autoRotate) btnAutoRotate.click();
+            }
+
+            update3DScene();
+        }
+
+        const btnAnimateUnfold = document.getElementById('btn-animate-unfold');
+        const btnAnimateUnfoldText = document.getElementById('btn-animate-unfold-text');
+
+        function updateUnfoldButtonUI() {
+            if (state.isUnfoldingAnim) {
+                btnAnimateUnfoldText.textContent = 'Jeda Animasi';
+                btnAnimateUnfold.classList.replace('bg-emerald-500', 'bg-amber-400');
+            } else {
+                btnAnimateUnfoldText.textContent = state.explode >= 0.98 ? 'Satukan Kembali ke Bola' : 'Mulai Animasi Kupas';
+                btnAnimateUnfold.classList.replace('bg-amber-400', 'bg-emerald-500');
+            }
+        }
+
+        btnAnimateUnfold.addEventListener('click', () => {
+            state.isUnfoldingAnim = !state.isUnfoldingAnim;
+            if (state.isUnfoldingAnim) state.unfoldDirection = (state.explode >= 0.98) ? -1 : 1;
+            updateUnfoldButtonUI();
+        });
+
+        document.getElementById('btn-top-view').addEventListener('click', () => {
+            camera.position.set(0, 13.5, 2.2);
+            controls.target.set(0, -1.2, 0);
+            controls.update();
+        });
+
+        const btnAnimatePour = document.getElementById('btn-animate-pour');
+        const btnAnimatePourText = document.getElementById('btn-animate-pour-text');
+
+        function updatePourButtonUI() {
+            if (!btnAnimatePour) return;
+            if (state.isPouringAnim) {
+                btnAnimatePourText.textContent = 'Jeda Penuangan';
+                btnAnimatePour.classList.replace('bg-amber-400', 'bg-sky-400');
+            } else {
+                btnAnimatePourText.textContent = state.explode >= 0.98 ? 'Isi Kembali ke Bola' : 'Tuang Air ke 2 Kerucut';
+                btnAnimatePour.classList.replace('bg-sky-400', 'bg-amber-400');
+            }
+        }
+
+        btnAnimatePour.addEventListener('click', () => {
+            state.isPouringAnim = !state.isPouringAnim;
+            if (state.isPouringAnim) state.pourDirection = (state.explode >= 0.98) ? -1 : 1;
+            updatePourButtonUI();
+        });
+
+        const btnToggleCones = document.getElementById('btn-toggle-cones');
+        const btnToggleConesText = document.getElementById('btn-toggle-cones-text');
+        btnToggleCones.addEventListener('click', () => {
+            state.showConesGuide = !state.showConesGuide;
+            btnToggleConesText.textContent = state.showConesGuide ? 'Ukuran: ON' : 'Ukuran: OFF';
+            update3DScene();
+        });
+
+        window.switchModeAndDemo = function(targetMode, targetPercent) {
+            switchTab('control');
+            if (targetMode === 'surface4') {
+                state.explode = 0;
+                sliderExplode.value = 0;
+                explodeValBadge.textContent = '0%';
+                setMode(targetMode);
+                state.unfoldDirection = 1;
+                state.isUnfoldingAnim = true;
+                updateUnfoldButtonUI();
+            } else if (targetMode === 'volumeWater') {
+                state.explode = 0;
+                sliderExplode.value = 0;
+                explodeValBadge.textContent = '0%';
+                setMode(targetMode);
+                state.pourDirection = 1;
+                state.isPouringAnim = true;
+                updatePourButtonUI();
+            } else {
+                state.explode = targetPercent / 100;
+                sliderExplode.value = targetPercent;
+                explodeValBadge.textContent = `${targetPercent}%`;
+                setMode(targetMode);
+            }
+        };
+
+        document.querySelectorAll('.mode-card').forEach(btn => {
+            btn.addEventListener('click', () => setMode(btn.dataset.mode));
+        });
+
+        sliderExplode.addEventListener('input', (e) => {
+            state.isUnfoldingAnim = false;
+            state.isPouringAnim = false;
+            const val = parseInt(e.target.value, 10);
+            state.explode = val / 100;
+            explodeValBadge.textContent = `${val}%`;
+            updateUnfoldButtonUI();
+            updatePourButtonUI();
+            update3DScene();
+        });
+
+        const sliderRadius = document.getElementById('slider-radius');
+        sliderRadius.addEventListener('input', (e) => {
+            state.radiusCm = parseFloat(e.target.value);
+            updateCalculations();
+            update3DScene();
+        });
+
+        const btnTogglePi = document.getElementById('btn-toggle-pi');
+        btnTogglePi.addEventListener('click', () => {
+            state.exactPiMode = !state.exactPiMode;
+            btnTogglePi.textContent = state.exactPiMode ? 'Mode: Simbol π' : 'Mode: Desimal';
+            updateCalculations();
+        });
+
+        const selectRadiusFormula = document.getElementById('select-radius-formula');
+        if (selectRadiusFormula) {
+            selectRadiusFormula.addEventListener('change', () => {
+                updateCalculations();
+            });
+        }
+
+        document.getElementById('toggle-labels').addEventListener('change', (e) => {
+            state.showLabels = e.target.checked;
+        });
+
+        const btnAutoRotate = document.getElementById('btn-autorotate');
+        btnAutoRotate.addEventListener('click', () => {
+            state.autoRotate = !state.autoRotate;
+            controls.autoRotate = state.autoRotate;
+            if (state.autoRotate) {
+                btnAutoRotate.classList.add('bg-sky-500/20', 'text-sky-300', 'border', 'border-sky-500/30');
+                btnAutoRotate.classList.remove('text-slate-300');
+            } else {
+                btnAutoRotate.classList.remove('bg-sky-500/20', 'text-sky-300', 'border', 'border-sky-500/30');
+                btnAutoRotate.classList.add('text-slate-300');
+            }
+        });
+
+        const btnWireframe = document.getElementById('btn-wireframe');
+        btnWireframe.addEventListener('click', () => {
+            state.wireframe = !state.wireframe;
+            if (state.wireframe) {
+                btnWireframe.classList.add('bg-sky-500/20', 'text-sky-300', 'border', 'border-sky-500/30');
+                btnWireframe.classList.remove('text-slate-300');
+            } else {
+                btnWireframe.classList.remove('bg-sky-500/20', 'text-sky-300', 'border', 'border-sky-500/30');
+                btnWireframe.classList.add('text-slate-300');
+            }
+            update3DScene();
+        });
+
+        document.getElementById('btn-reset-cam').addEventListener('click', () => {
+            camera.position.set(6.5, 4.5, 8.5);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        });
+
+        const tabBtnControl = document.getElementById('tab-btn-control');
+        const tabBtnLearn = document.getElementById('tab-btn-learn');
+        const tabContentControl = document.getElementById('tab-content-control');
+        const tabContentLearn = document.getElementById('tab-content-learn');
+
+        function switchTab(tabName) {
+            if (tabName === 'control') {
+                tabBtnControl.className = 'tab-btn active py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-sky-400 text-slate-950 shadow-lg shadow-sky-500/20 transition-all';
+                tabBtnLearn.className = 'tab-btn py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80 transition-all';
+                tabContentControl.classList.remove('hidden');
+                tabContentLearn.classList.add('hidden');
+            } else {
+                tabBtnLearn.className = 'tab-btn active py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-sky-400 text-slate-950 shadow-lg shadow-sky-500/20 transition-all';
+                tabBtnControl.className = 'tab-btn py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80 transition-all';
+                tabContentLearn.classList.remove('hidden');
+                tabContentControl.classList.add('hidden');
+            }
+        }
+
+        tabBtnControl.addEventListener('click', () => switchTab('control'));
+        tabBtnLearn.addEventListener('click', () => switchTab('learn'));
+
+        function onWindowResize() {
+            if (!container) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+        window.addEventListener('resize', onWindowResize);
+
+        // Proyeksi titik 3D ke koordinat layar 2D untuk label
+        function projectToScreen(vec3, element) {
+            if (!element) return;
+            const worldPos = vec3.clone().applyMatrix4(masterSphereGroup.matrixWorld);
+            const projected = worldPos.project(camera);
+            if (projected.z > 1) {
+                element.style.opacity = '0';
+                return;
+            }
+            const x = (projected.x * 0.5 + 0.5) * container.clientWidth;
+            const y = (projected.y * -0.5 + 0.5) * container.clientHeight;
+            element.style.left = `${x}px`;
+            element.style.top = `${y}px`;
+            element.style.opacity = '1';
+        }
+
+        function update3DLabels() {
+            const lblCenter = document.getElementById('label-center');
+            const lblRadius = document.getElementById('label-radius');
+            const lblDiameter = document.getElementById('label-diameter');
+            const lblEquator = document.getElementById('label-equator');
+            const circleLabels = [
+                document.getElementById('label-circle-1'),
+                document.getElementById('label-circle-2'),
+                document.getElementById('label-circle-3'),
+                document.getElementById('label-circle-4')
+            ];
+
+            if (!state.showLabels) {
+                [lblCenter, lblRadius, lblDiameter, lblEquator, ...circleLabels].forEach(el => {
+                    if (el) el.style.opacity = '0';
+                });
+                return;
+            }
+
+            if (state.mode === 'full' || state.mode === 'hemisphere') {
+                if (lblCenter) {
+                    lblCenter.classList.remove('hidden');
+                    projectToScreen(new THREE.Vector3(0, 0, 0), lblCenter);
+                }
+                if (lblRadius) {
+                    lblRadius.classList.remove('hidden');
+                    projectToScreen(radiusEndPoint.clone().multiplyScalar(0.55), lblRadius);
+                }
+                if (lblDiameter) {
+                    lblDiameter.classList.remove('hidden');
+                    projectToScreen(new THREE.Vector3(-BASE_VISUAL_RADIUS * 0.65, 0, 0), lblDiameter);
+                }
+                if (lblEquator) {
+                    if (state.mode === 'hemisphere') {
+                        lblEquator.classList.remove('hidden');
+                        projectToScreen(new THREE.Vector3(0, state.explode * 2.2, BASE_VISUAL_RADIUS), lblEquator);
+                    } else {
+                        lblEquator.classList.add('hidden');
+                    }
+                }
+                circleLabels.forEach(el => el && el.classList.add('hidden'));
+            } else if (state.mode === 'surface4') {
+                [lblCenter, lblRadius, lblDiameter, lblEquator].forEach(el => el && el.classList.add('hidden'));
+                surface4Config.forEach((cfg, idx) => {
+                    const el = circleLabels[idx];
+                    if (!el) return;
+                    if (state.explode > 0.45) {
+                        el.classList.remove('hidden');
+                        projectToScreen(cfg.targetPos.clone().add(new THREE.Vector3(0, 0.25, 0)), el);
+                    } else {
+                        el.classList.add('hidden');
+                    }
+                });
+            } else {
+                [lblCenter, lblRadius, lblDiameter, lblEquator, ...circleLabels].forEach(el => el && el.classList.add('hidden'));
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (state.isUnfoldingAnim && state.mode === 'surface4') {
+                state.explode += 0.0085 * state.unfoldDirection;
+                if (state.explode >= 1) {
+                    state.explode = 1;
+                    state.isUnfoldingAnim = false;
+                    updateUnfoldButtonUI();
+                } else if (state.explode <= 0) {
+                    state.explode = 0;
+                    state.isUnfoldingAnim = false;
+                    updateUnfoldButtonUI();
+                }
+                const pct = Math.round(state.explode * 100);
+                sliderExplode.value = pct;
+                explodeValBadge.textContent = `${pct}%`;
+                update3DScene();
+            }
+
+            if (state.isPouringAnim && state.mode === 'volumeWater') {
+                state.explode += 0.0085 * state.pourDirection;
+                if (state.explode >= 1) {
+                    state.explode = 1;
+                    state.isPouringAnim = false;
+                    updatePourButtonUI();
+                } else if (state.explode <= 0) {
+                    state.explode = 0;
+                    state.isPouringAnim = false;
+                    updatePourButtonUI();
+                }
+                const pct = Math.round(state.explode * 100);
+                sliderExplode.value = pct;
+                explodeValBadge.textContent = `${pct}%`;
+                update3DScene();
+            }
+
+            controls.update();
+            update3DLabels();
+            renderer.render(scene, camera);
+        }
+
+        updateCalculations();
+        update3DScene();
+        animate();
+    </script>
+</body>
+</html>
